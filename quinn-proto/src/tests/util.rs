@@ -18,26 +18,26 @@ use tracing::{info_span, trace};
 
 use super::*;
 
-pub struct Pair {
-    pub server: TestEndpoint,
-    pub client: TestEndpoint,
-    pub time: Instant,
+pub(super) struct Pair {
+    pub(super) server: TestEndpoint,
+    pub(super) client: TestEndpoint,
+    pub(super) time: Instant,
     // One-way
-    pub latency: Duration,
+    pub(super) latency: Duration,
     /// Number of spin bit flips
-    pub spins: u64,
+    pub(super) spins: u64,
     last_spin: bool,
 }
 
 impl Pair {
-    pub fn new(endpoint_config: Arc<EndpointConfig>, server_config: ServerConfig) -> Self {
+    pub(super) fn new(endpoint_config: Arc<EndpointConfig>, server_config: ServerConfig) -> Self {
         let server = Endpoint::new(endpoint_config.clone(), Some(Arc::new(server_config)));
         let client = Endpoint::new(endpoint_config, None);
 
         Pair::new_from_endpoint(client, server)
     }
 
-    pub fn new_from_endpoint(client: Endpoint, server: Endpoint) -> Self {
+    pub(super) fn new_from_endpoint(client: Endpoint, server: Endpoint) -> Self {
         let server_addr = SocketAddr::new(
             Ipv6Addr::LOCALHOST.into(),
             SERVER_PORTS.lock().unwrap().next().unwrap(),
@@ -57,7 +57,7 @@ impl Pair {
     }
 
     /// Returns whether the connection is not idle
-    pub fn step(&mut self) -> bool {
+    pub(super) fn step(&mut self) -> bool {
         self.drive_client();
         self.drive_server();
         if self.client.is_idle() && self.server.is_idle() {
@@ -87,11 +87,11 @@ impl Pair {
     }
 
     /// Advance time until both connections are idle
-    pub fn drive(&mut self) {
+    pub(super) fn drive(&mut self) {
         while self.step() {}
     }
 
-    pub fn drive_client(&mut self) {
+    pub(super) fn drive_client(&mut self) {
         let span = info_span!("client");
         let _guard = span.enter();
         self.client.drive(self.time, self.server.addr);
@@ -112,7 +112,7 @@ impl Pair {
         }
     }
 
-    pub fn drive_server(&mut self) {
+    pub(super) fn drive_server(&mut self) {
         let span = info_span!("server");
         let _guard = span.enter();
         self.server.drive(self.time, self.client.addr);
@@ -128,11 +128,14 @@ impl Pair {
         }
     }
 
-    pub fn connect(&mut self) -> (ConnectionHandle, ConnectionHandle) {
+    pub(super) fn connect(&mut self) -> (ConnectionHandle, ConnectionHandle) {
         self.connect_with(client_config())
     }
 
-    pub fn connect_with(&mut self, config: ClientConfig) -> (ConnectionHandle, ConnectionHandle) {
+    pub(super) fn connect_with(
+        &mut self,
+        config: ClientConfig,
+    ) -> (ConnectionHandle, ConnectionHandle) {
         info!("connecting");
         let client_ch = self.begin_connect(config);
         self.drive();
@@ -142,7 +145,7 @@ impl Pair {
     }
 
     /// Just start connecting the client
-    pub fn begin_connect(&mut self, config: ClientConfig) -> ConnectionHandle {
+    pub(super) fn begin_connect(&mut self, config: ClientConfig) -> ConnectionHandle {
         let span = info_span!("client");
         let _guard = span.enter();
         let (client_ch, client_conn) = self
@@ -172,43 +175,43 @@ impl Pair {
         );
     }
 
-    pub fn client_conn_mut(&mut self, ch: ConnectionHandle) -> &mut Connection {
+    pub(super) fn client_conn_mut(&mut self, ch: ConnectionHandle) -> &mut Connection {
         self.client.connections.get_mut(&ch).unwrap()
     }
 
-    pub fn client_streams(&mut self, ch: ConnectionHandle) -> Streams<'_> {
+    pub(super) fn client_streams(&mut self, ch: ConnectionHandle) -> Streams<'_> {
         self.client_conn_mut(ch).streams()
     }
 
-    pub fn client_send(&mut self, ch: ConnectionHandle, s: StreamId) -> SendStream<'_> {
+    pub(super) fn client_send(&mut self, ch: ConnectionHandle, s: StreamId) -> SendStream<'_> {
         self.client_conn_mut(ch).send_stream(s)
     }
 
-    pub fn client_recv(&mut self, ch: ConnectionHandle, s: StreamId) -> RecvStream<'_> {
+    pub(super) fn client_recv(&mut self, ch: ConnectionHandle, s: StreamId) -> RecvStream<'_> {
         self.client_conn_mut(ch).recv_stream(s)
     }
 
-    pub fn client_datagrams(&mut self, ch: ConnectionHandle) -> Datagrams<'_> {
+    pub(super) fn client_datagrams(&mut self, ch: ConnectionHandle) -> Datagrams<'_> {
         self.client_conn_mut(ch).datagrams()
     }
 
-    pub fn server_conn_mut(&mut self, ch: ConnectionHandle) -> &mut Connection {
+    pub(super) fn server_conn_mut(&mut self, ch: ConnectionHandle) -> &mut Connection {
         self.server.connections.get_mut(&ch).unwrap()
     }
 
-    pub fn server_streams(&mut self, ch: ConnectionHandle) -> Streams<'_> {
+    pub(super) fn server_streams(&mut self, ch: ConnectionHandle) -> Streams<'_> {
         self.server_conn_mut(ch).streams()
     }
 
-    pub fn server_send(&mut self, ch: ConnectionHandle, s: StreamId) -> SendStream<'_> {
+    pub(super) fn server_send(&mut self, ch: ConnectionHandle, s: StreamId) -> SendStream<'_> {
         self.server_conn_mut(ch).send_stream(s)
     }
 
-    pub fn server_recv(&mut self, ch: ConnectionHandle, s: StreamId) -> RecvStream<'_> {
+    pub(super) fn server_recv(&mut self, ch: ConnectionHandle, s: StreamId) -> RecvStream<'_> {
         self.server_conn_mut(ch).recv_stream(s)
     }
 
-    pub fn server_datagrams(&mut self, ch: ConnectionHandle) -> Datagrams<'_> {
+    pub(super) fn server_datagrams(&mut self, ch: ConnectionHandle) -> Datagrams<'_> {
         self.server_conn_mut(ch).datagrams()
     }
 }
@@ -219,16 +222,16 @@ impl Default for Pair {
     }
 }
 
-pub struct TestEndpoint {
-    pub endpoint: Endpoint,
-    pub addr: SocketAddr,
+pub(super) struct TestEndpoint {
+    pub(super) endpoint: Endpoint,
+    pub(super) addr: SocketAddr,
     socket: Option<UdpSocket>,
     timeout: Option<Instant>,
-    pub outbound: VecDeque<Transmit>,
+    pub(super) outbound: VecDeque<Transmit>,
     delayed: VecDeque<Transmit>,
-    pub inbound: VecDeque<(Instant, Option<EcnCodepoint>, Vec<u8>)>,
+    pub(super) inbound: VecDeque<(Instant, Option<EcnCodepoint>, Vec<u8>)>,
     accepted: Option<ConnectionHandle>,
-    pub connections: HashMap<ConnectionHandle, Connection>,
+    pub(super) connections: HashMap<ConnectionHandle, Connection>,
     conn_events: HashMap<ConnectionHandle, VecDeque<ConnectionEvent>>,
 }
 
@@ -257,7 +260,7 @@ impl TestEndpoint {
         }
     }
 
-    pub fn drive(&mut self, now: Instant, remote: SocketAddr) {
+    pub(super) fn drive(&mut self, now: Instant, remote: SocketAddr) {
         if let Some(ref socket) = self.socket {
             loop {
                 let mut buf = [0; 8192];
@@ -324,7 +327,7 @@ impl TestEndpoint {
         }
     }
 
-    pub fn next_wakeup(&self) -> Option<Instant> {
+    pub(super) fn next_wakeup(&self) -> Option<Instant> {
         let next_inbound = self.inbound.front().map(|x| x.0);
         min_opt(self.timeout, next_inbound)
     }
@@ -333,16 +336,16 @@ impl TestEndpoint {
         self.connections.values().all(|x| x.is_idle())
     }
 
-    pub fn delay_outbound(&mut self) {
+    pub(super) fn delay_outbound(&mut self) {
         assert!(self.delayed.is_empty());
         mem::swap(&mut self.delayed, &mut self.outbound);
     }
 
-    pub fn finish_delay(&mut self) {
+    pub(super) fn finish_delay(&mut self) {
         self.outbound.extend(self.delayed.drain(..));
     }
 
-    pub fn assert_accept(&mut self) -> ConnectionHandle {
+    pub(super) fn assert_accept(&mut self) -> ConnectionHandle {
         self.accepted.take().expect("server didn't connect")
     }
 }
@@ -360,7 +363,7 @@ impl ::std::ops::DerefMut for TestEndpoint {
     }
 }
 
-pub fn subscribe() -> tracing::subscriber::DefaultGuard {
+pub(super) fn subscribe() -> tracing::subscriber::DefaultGuard {
     let sub = tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(tracing::Level::TRACE)
         .with_writer(|| TestWriter)
@@ -383,38 +386,38 @@ impl Write for TestWriter {
     }
 }
 
-pub fn server_config() -> ServerConfig {
+pub(super) fn server_config() -> ServerConfig {
     ServerConfig::with_crypto(Arc::new(server_crypto()))
 }
 
-pub fn server_config_with_cert(cert: Certificate, key: PrivateKey) -> ServerConfig {
+pub(super) fn server_config_with_cert(cert: Certificate, key: PrivateKey) -> ServerConfig {
     ServerConfig::with_crypto(Arc::new(server_crypto_with_cert(cert, key)))
 }
 
-pub fn server_crypto() -> rustls::ServerConfig {
+pub(super) fn server_crypto() -> rustls::ServerConfig {
     let cert = Certificate(CERTIFICATE.serialize_der().unwrap());
     let key = PrivateKey(CERTIFICATE.serialize_private_key_der());
     server_crypto_with_cert(cert, key)
 }
 
-pub fn server_crypto_with_cert(cert: Certificate, key: PrivateKey) -> rustls::ServerConfig {
+pub(super) fn server_crypto_with_cert(cert: Certificate, key: PrivateKey) -> rustls::ServerConfig {
     crate::crypto::rustls::server_config(vec![cert], key).unwrap()
 }
 
-pub fn client_config() -> ClientConfig {
+pub(super) fn client_config() -> ClientConfig {
     ClientConfig::new(Arc::new(client_crypto()))
 }
 
-pub fn client_config_with_certs(certs: Vec<rustls::Certificate>) -> ClientConfig {
+pub(super) fn client_config_with_certs(certs: Vec<rustls::Certificate>) -> ClientConfig {
     ClientConfig::new(Arc::new(client_crypto_with_certs(certs)))
 }
 
-pub fn client_crypto() -> rustls::ClientConfig {
+pub(super) fn client_crypto() -> rustls::ClientConfig {
     let cert = rustls::Certificate(CERTIFICATE.serialize_der().unwrap());
     client_crypto_with_certs(vec![cert])
 }
 
-pub fn client_crypto_with_certs(certs: Vec<rustls::Certificate>) -> rustls::ClientConfig {
+pub(super) fn client_crypto_with_certs(certs: Vec<rustls::Certificate>) -> rustls::ClientConfig {
     let mut roots = rustls::RootCertStore::empty();
     for cert in certs {
         roots.add(&cert).unwrap();
@@ -424,7 +427,7 @@ pub fn client_crypto_with_certs(certs: Vec<rustls::Certificate>) -> rustls::Clie
     config
 }
 
-pub fn min_opt<T: Ord>(x: Option<T>, y: Option<T>) -> Option<T> {
+pub(super) fn min_opt<T: Ord>(x: Option<T>, y: Option<T>) -> Option<T> {
     match (x, y) {
         (Some(x), Some(y)) => Some(cmp::min(x, y)),
         (Some(x), _) => Some(x),

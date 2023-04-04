@@ -4,35 +4,35 @@ use super::pacing::Pacer;
 use crate::{congestion, packet::SpaceId, TIMER_GRANULARITY};
 
 /// Description of a particular network path
-pub struct PathData {
-    pub remote: SocketAddr,
-    pub rtt: RttEstimator,
+pub(super) struct PathData {
+    pub(super) remote: SocketAddr,
+    pub(super) rtt: RttEstimator,
     /// Whether we're enabling ECN on outgoing packets
-    pub sending_ecn: bool,
+    pub(super) sending_ecn: bool,
     /// Congestion controller state
-    pub congestion: Box<dyn congestion::Controller>,
+    pub(super) congestion: Box<dyn congestion::Controller>,
     /// Pacing state
-    pub pacing: Pacer,
-    pub challenge: Option<u64>,
-    pub challenge_pending: bool,
+    pub(super) pacing: Pacer,
+    pub(super) challenge: Option<u64>,
+    pub(super) challenge_pending: bool,
     /// Whether we're certain the peer can both send and receive on this address
     ///
     /// Initially equal to `use_stateless_retry` for servers, and becomes false again on every
     /// migration. Always true for clients.
-    pub validated: bool,
+    pub(super) validated: bool,
     /// Total size of all UDP datagrams sent on this path
-    pub total_sent: u64,
+    pub(super) total_sent: u64,
     /// Total size of all UDP datagrams received on this path
-    pub total_recvd: u64,
-    pub max_udp_payload_size: u16,
+    pub(super) total_recvd: u64,
+    pub(super) max_udp_payload_size: u16,
     /// Packet number of the first packet sent after an RTT sample was collected on this path
     ///
     /// Used in persistent congestion determination.
-    pub first_packet_after_rtt_sample: Option<(SpaceId, u64)>,
+    pub(super) first_packet_after_rtt_sample: Option<(SpaceId, u64)>,
 }
 
 impl PathData {
-    pub fn new(
+    pub(super) fn new(
         remote: SocketAddr,
         initial_rtt: Duration,
         congestion: Box<dyn congestion::Controller>,
@@ -61,7 +61,7 @@ impl PathData {
         }
     }
 
-    pub fn from_previous(remote: SocketAddr, prev: &PathData, now: Instant) -> Self {
+    pub(super) fn from_previous(remote: SocketAddr, prev: &PathData, now: Instant) -> Self {
         let congestion = prev.congestion.clone_box();
         let smoothed_rtt = prev.rtt.get();
         PathData {
@@ -87,7 +87,7 @@ impl PathData {
 
     /// Indicates whether we're a server that hasn't validated the peer's address and hasn't
     /// received enough data from the peer to permit sending `bytes_to_send` additional bytes
-    pub fn anti_amplification_blocked(&self, bytes_to_send: u64) -> bool {
+    pub(super) fn anti_amplification_blocked(&self, bytes_to_send: u64) -> bool {
         !self.validated && self.total_recvd * 3 < self.total_sent + bytes_to_send
     }
 }
